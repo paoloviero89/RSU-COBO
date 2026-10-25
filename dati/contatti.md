@@ -27,7 +27,7 @@ reparto: Ufficio Tecnico
 
 ## Claudio Pasquini
 ruolo: Delegato RSU · RLS
-reparto: Presse· RLS
+reparto: Presse
 
 ## Ermira Lutia:
 ruolo: Delegato RSU
