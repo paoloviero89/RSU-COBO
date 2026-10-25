@@ -73,6 +73,7 @@
     return { data, body: lines.slice(i).join("\n").trim() };
   }
   const yes = v => /^(si|sì|s|yes|true|x|1)$/i.test(String(v || "").trim());
+  const parseTags = s => String(s || "").split(/[,;]+/).map(t => t.trim().replace(/^#/, "").trim()).filter(Boolean);
 
   const PARSERS = {
     aggiornamenti: txt => blocks(txt, 1).map(b => {
@@ -82,6 +83,16 @@
     proposte: txt => blocks(txt, 1).map(b => {
       const { data, body } = meta(b.lines, ["ambito", "stato", "aggiornato", "richiesta"]);
       return { titolo: b.titolo, ambito: data.ambito, stato: data.stato, aggiornato: toISO(data.aggiornato), richiesta: data.richiesta, motivazione: body };
+    }),
+    convenzioni: txt => blocks(txt, 1).map(b => {
+      const { data, body } = meta(b.lines, ["tag", "tags", "sconto", "valida fino al", "scadenza", "dove", "contatti"]);
+      return { titolo: b.titolo, tags: parseTags(data.tag || data.tags), sconto: data.sconto, scadenza: toISO(data["valida fino al"] || data.scadenza),
+        dove: data.dove, contatti: data.contatti, testo: body };
+    }),
+    segnalazioni: txt => blocks(txt, 1).map(b => {
+      const { data, body } = meta(b.lines, ["tag", "tags", "stato", "reparto", "inviata il", "inviata", "risposta il", "risposta"]);
+      return { titolo: b.titolo, tags: parseTags(data.tag || data.tags), stato: data.stato, reparto: data.reparto,
+        inviata: toISO(data["inviata il"] || data.inviata), risposta_il: toISO(data["risposta il"]), risposta: data.risposta, testo: body };
     }),
     contatti: txt => {
       const out = { delegati: [], altri_contatti: [] };
@@ -173,7 +184,7 @@
   async function renderContratto(el) {
     let items;
     try { items = await load("proposte"); } catch (e) { el.innerHTML = errorBox(e); return; }
-    const intro = `<p class="intro">Le richieste della RSU per il contratto integrativo aziendale e a che punto è la trattativa su ciascuna.</p>`;
+    const intro = `<p class="intro">Le proposte raccolte per il contratto integrativo aziendale.</p>`;
     if (!Array.isArray(items) || !items.length) { el.innerHTML = intro + `<div class="empty">Le proposte per il contratto interno compariranno qui.</div>`; return; }
     items = items.filter(x => x && x.titolo).map(x => ({ ...x, _s: normStato(x.stato) }));
     const counts = Object.fromEntries(STATI.map(s => [s.k, 0]));
@@ -260,10 +271,128 @@
     el.innerHTML = html || `<div class="empty">I contatti della RSU compariranno qui.</div>`;
   }
 
+  /* ---------- filtri per tag (Convenzioni e Segnalazioni) ---------- */
+  const tagSel = {}, tagDraw = {};
+  const fmtLong = s => { const d = parseISO(s); return d ? `${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()}` : ""; };
+  function tagBar(view, items, allLabel) {
+    const map = new Map();
+    items.forEach(x => (x.tags || []).forEach(t => {
+      const k = normKey(t); const e = map.get(k) || { label: t, n: 0 }; e.n++; map.set(k, e);
+    }));
+    if (!map.size) return "";
+    const sel = tagSel[view] || "";
+    const list = [...map.entries()].sort((a, b) => b[1].n - a[1].n || a[1].label.localeCompare(b[1].label, "it"));
+    return `<div class="filters" role="group" aria-label="Filtra per tag">
+      <button type="button" class="fchip" data-tagview="${view}" data-tag="" aria-pressed="${!sel}">${esc(allLabel)} <b>${items.length}</b></button>
+      ${list.map(([k, e]) => `<button type="button" class="fchip" data-tagview="${view}" data-tag="${esc(k)}" aria-pressed="${sel === k}">#${esc(e.label)} <b>${e.n}</b></button>`).join("")}
+    </div>`;
+  }
+  const hasTag = (x, view) => !tagSel[view] || (x.tags || []).some(t => normKey(t) === tagSel[view]);
+  const tagPills = (x, view) => (x.tags || []).map(t =>
+    `<button type="button" class="tag" data-tagview="${view}" data-tag="${esc(normKey(t))}">#${esc(t)}</button>`).join("");
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-tagview]"); if (!b) return;
+    const view = b.dataset.tagview, k = b.dataset.tag;
+    tagSel[view] = (b.classList.contains("fchip") || tagSel[view] !== k) ? k : "";
+    if (tagDraw[view]) tagDraw[view]();
+    if (b.classList.contains("tag")) { const f = $("#v-" + view + " .filters"); if (f) f.scrollIntoView({ block: "nearest" }); window.scrollTo({ top: 0 }); }
+  });
+
+  /* ---------- CONVENZIONI ---------- */
+  async function renderConvenzioni(el) {
+    let items;
+    try { items = await load("convenzioni"); } catch (e) { el.innerHTML = errorBox(e); return; }
+    const intro = `<p class="intro">Sconti e agevolazioni attive per chi lavora in COBO. Toccate un tag per vedere solo quelle che vi interessano.</p>`;
+    items = (items || []).filter(x => x && x.titolo);
+    const active = items.filter(x => !x.scadenza || daysAgo(x.scadenza) <= 0);
+    const expired = items.length - active.length;
+    if (!active.length) { el.innerHTML = intro + `<div class="empty">Nessuna convenzione attiva al momento.</div>`; return; }
+    active.sort((a, b) => a.titolo.localeCompare(b.titolo, "it"));
+    tagDraw.convenzioni = () => {
+      const rows = active.filter(x => hasTag(x, "convenzioni"));
+      el.innerHTML = intro + tagBar("convenzioni", active, "Tutte") + (rows.length ? rows.map(x => {
+        const left = x.scadenza ? -daysAgo(x.scadenza) : null;
+        const exp = x.scadenza ? `<span class="meta ${left <= 30 ? "warn" : ""}">Valida fino al ${esc(fmtLong(x.scadenza))}${left <= 30 ? (left === 0 ? " · scade oggi" : ` · scade tra ${left} ${left === 1 ? "giorno" : "giorni"}`) : ""}</span>` : "";
+        return `<article class="post">
+          ${x.tags.length ? `<div class="post-head">${tagPills(x, "convenzioni")}</div>` : ""}
+          <h2>${esc(x.titolo)}</h2>
+          ${x.sconto ? `<p class="deal">${esc(x.sconto)}</p>` : ""}
+          ${x.testo ? `<div class="rich">${rich(x.testo)}</div>` : ""}
+          ${(x.dove || x.contatti) ? `<dl class="facts">
+            ${x.dove ? `<div><dt>Dove</dt><dd>${inline(x.dove)}</dd></div>` : ""}
+            ${x.contatti ? `<div><dt>Contatti</dt><dd>${inline(x.contatti)}</dd></div>` : ""}
+          </dl>` : ""}
+          ${exp}
+        </article>`;
+      }).join("") : `<div class="empty">Nessuna convenzione con questo tag.</div>`)
+      + (expired ? `<p class="meta">${expired === 1 ? "1 convenzione scaduta non è mostrata." : `${expired} convenzioni scadute non sono mostrate.`}</p>` : "");
+    };
+    tagDraw.convenzioni();
+  }
+
+  /* ---------- SEGNALAZIONI ---------- */
+  const STATI_S = [
+    { k: "attesa", label: "In attesa di risposta", c: "--s-amber" },
+    { k: "dainviare", label: "Da inviare all'azienda", c: "--s-gray" },
+    { k: "risposta", label: "Risposta ricevuta", c: "--s-blue" },
+    { k: "risolta", label: "Risolta", c: "--s-green" },
+    { k: "respinta", label: "Non accolta", c: "--s-red" }
+  ];
+  function normStatoS(x) {
+    const v = normKey(x.stato);
+    if (/^(da invia|bozza|prepar|da fare)/.test(v)) return "dainviare";
+    if (/(attesa|inviata|aperta)/.test(v)) return "attesa";
+    if (/^(risolt|chius|fatt)/.test(v)) return "risolta";
+    if (/^(respint|non accolt|rifiut)/.test(v)) return "respinta";
+    if (/^rispost/.test(v)) return "risposta";
+    return x.inviata ? "attesa" : "dainviare";
+  }
+  async function renderSegnalazioni(el) {
+    let items;
+    try { items = await load("segnalazioni"); } catch (e) { el.innerHTML = errorBox(e); return; }
+    const intro = `<p class="intro">Le segnalazioni che la RSU porta all'azienda: quelle da inviare, quelle in attesa di risposta e com'è andata.</p>`;
+    items = (items || []).filter(x => x && x.titolo).map(x => ({ ...x, _s: normStatoS(x) }));
+    if (!items.length) { el.innerHTML = intro + `<div class="empty">Nessuna segnalazione per ora.</div>`; return; }
+    tagDraw.segnalazioni = () => {
+      const rows = items.filter(x => hasTag(x, "segnalazioni"));
+      const counts = Object.fromEntries(STATI_S.map(s => [s.k, 0])); rows.forEach(x => counts[x._s]++);
+      const tot = rows.length;
+      const summary = tot ? `<div class="summary" aria-label="Riepilogo">
+        <div class="bar" aria-hidden="true">${STATI_S.filter(s => counts[s.k]).map(s => `<span style="width:${counts[s.k] / tot * 100}%;background:var(${s.c})"></span>`).join("")}</div>
+        <div class="legend">${STATI_S.filter(s => counts[s.k]).map(s => `<span style="--st:var(${s.c})"><i class="dot"></i>${esc(s.label)} <b>${counts[s.k]}</b></span>`).join("")}</div>
+      </div>` : "";
+      const groups = STATI_S.map(s => {
+        const g = rows.filter(x => x._s === s.k).sort((a, b) => s.k === "attesa"
+          ? String(a.inviata || "9").localeCompare(String(b.inviata || "9"))
+          : String(b.inviata || "").localeCompare(String(a.inviata || "")));
+        if (!g.length) return "";
+        return `<h2 class="group-title">${esc(s.label)}</h2>` + g.map(x => {
+          const wait = s.k === "attesa" && x.inviata ? daysAgo(x.inviata) : null;
+          const info = [x.reparto, x.inviata ? `inviata il ${fmtLong(x.inviata)}` : ""].filter(Boolean).join(" · ");
+          return `<article class="prop" style="--st:var(${s.c})">
+            <div class="prop-head">
+              <span class="state"><i class="dot"></i>${esc(s.label)}</span>
+              ${wait !== null && wait >= 0 ? `<span class="wait ${wait > 30 ? "late" : ""}">${wait === 0 ? "da oggi" : `da ${wait} ${wait === 1 ? "giorno" : "giorni"}`}</span>` : ""}
+            </div>
+            <h2>${esc(x.titolo)}</h2>
+            ${x.testo ? `<div class="rich">${rich(x.testo)}</div>` : ""}
+            ${x.risposta ? `<div class="reply"><h3>Risposta dell'azienda${x.risposta_il ? ` · ${esc(fmtLong(x.risposta_il))}` : ""}</h3><p>${inline(x.risposta)}</p></div>` : ""}
+            ${info ? `<span class="meta">${esc(info.charAt(0).toUpperCase() + info.slice(1))}</span>` : ""}
+            ${x.tags.length ? `<div class="tags">${tagPills(x, "segnalazioni")}</div>` : ""}
+          </article>`;
+        }).join("");
+      }).join("");
+      el.innerHTML = intro + tagBar("segnalazioni", items, "Tutte") + summary + (groups || `<div class="empty">Nessuna segnalazione con questo tag.</div>`);
+    };
+    tagDraw.segnalazioni();
+  }
+
   /* ---------- navigazione ---------- */
   const VIEWS = {
     aggiornamenti: { title: "Aggiornamenti", render: renderAggiornamenti },
     contratto: { title: "Contratto interno", render: renderContratto },
+    convenzioni: { title: "Convenzioni", render: renderConvenzioni },
+    segnalazioni: { title: "Segnalazioni", render: renderSegnalazioni },
     contatti: { title: "Contatti", render: renderContatti }
   };
   const rendered = {};
@@ -342,7 +471,7 @@
   if (navigator.share) {
     $("#shareNative").hidden = false;
     $("#shareNative").addEventListener("click", () => {
-      navigator.share({ title: "RSU COBO", text: "L'app della RSU COBO: aggiornamenti, contratto interno e contatti.", url: appUrl }).catch(() => {});
+      navigator.share({ title: "RSU COBO", text: "L'app della RSU COBO", url: appUrl }).catch(() => {});
     });
   }
   $("#shareCopy").addEventListener("click", async () => {
@@ -356,6 +485,15 @@
 
   /* ---------- service worker (funzionamento offline) ---------- */
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+    // Controlla subito se è stata pubblicata una versione nuova e, quando arriva, ricarica la pagina una volta.
+    const hadController = !!navigator.serviceWorker.controller; let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloading) return; reloading = true; location.reload();
+    });
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+        .then(r => { r.update().catch(() => {}); document.addEventListener("visibilitychange", () => { if (!document.hidden) r.update().catch(() => {}); }); })
+        .catch(() => {});
+    });
   }
 })();

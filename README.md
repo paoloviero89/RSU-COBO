@@ -4,6 +4,8 @@ Web app installabile sul telefono (Android e iPhone) con tre sezioni:
 
 - **Aggiornamenti**: notizie dagli incontri con l'azienda e dalle assemblee
 - **Contratto**: le proposte per il contratto interno e a che punto sono
+- **Convenzioni**: sconti e agevolazioni attive, filtrabili per tag
+- **Segnalazioni**: cosa la RSU deve chiedere o ha chiesto all'azienda e com'è andata, filtrabili per tag
 - **Contatti**: delegati RSU, orari e luogo della saletta sindacale
 
 Funziona anche senza rete: mostra l'ultima versione scaricata.
@@ -65,6 +67,8 @@ I contenuti stanno in tre file di testo nella cartella `dati`:
 |---|---|
 | `dati/aggiornamenti.md` | Aggiornamenti |
 | `dati/proposte.md` | Contratto |
+| `dati/convenzioni.md` | Convenzioni |
+| `dati/segnalazioni.md` | Segnalazioni |
 | `dati/contatti.md` | Contatti |
 
 ### Da computer o telefono, sul sito di GitHub
@@ -129,6 +133,57 @@ Valori per `stato`:
 | `ottenuta` | Ottenuta |
 | `respinta` | Non accolta |
 
+### Esempio: `convenzioni.md`
+
+```markdown
+# Palestra del paese
+tag: sport, salute
+sconto: 20% sull'abbonamento annuale
+valida fino al: 31/12/2026
+dove: Via Roma 1, Verolanuova
+contatti: 030 123456 · https://...
+
+Basta mostrare il badge aziendale alla reception.
+```
+
+- **`tag`**: parole separate da virgola. In cima alla pagina diventano i pulsanti per filtrare. Toccando un tag su una scheda si filtra per quel tag.
+- **`valida fino al`**: dopo quella data la convenzione sparisce da sola. Nell'ultimo mese compare in rosso "scade tra N giorni". Senza data resta sempre visibile.
+- Tutte le righe sono facoltative, tranne il titolo.
+
+### Esempio: `segnalazioni.md`
+
+```markdown
+# Temperatura troppo alta in reparto collaudo
+tag: ambiente, salute e sicurezza
+stato: in attesa
+reparto: Collaudo
+inviata il: 02/09/2026
+
+Nel pomeriggio si superano spesso i 30 °C. Chiediamo una verifica dell'impianto.
+```
+
+Quando arriva la risposta, cambiate `stato` e aggiungete due righe:
+
+```markdown
+stato: risolta
+risposta il: 30/09/2026
+risposta: Sostituito il condizionatore del reparto.
+```
+
+Valori per `stato`:
+
+| Scrivete | Nell'app compare |
+|---|---|
+| `da inviare` | Da inviare all'azienda |
+| `in attesa` | In attesa di risposta, con i giorni passati da `inviata il` (in rosso oltre 30) |
+| `risposta` | Risposta ricevuta |
+| `risolta` | Risolta |
+| `respinta` | Non accolta |
+
+Il sito è pubblico: nelle segnalazioni niente nomi di colleghi o casi personali riconoscibili.
+
+**Consiglio per i tag:** usate sempre le stesse parole (ad esempio sempre `salute`, non a volte `sanità`), così i filtri restano pochi e chiari.
+
 ### Esempio: `contatti.md`
 
 Il file ha tre sezioni fisse: lasciate i titoli `# Saletta sindacale`, `# Delegati RSU` e `# Altri contatti`. Le persone e le voci sotto le sezioni iniziano con **due** cancelletti `## `.
@@ -169,7 +224,9 @@ https://...
 
 ## 4. Modificare l'app stessa (raro)
 
-Se cambiate `index.html`, `stile.css`, `app.js` o `volantino.html`, aprite `sw.js` e aumentate il numero in `const VERSIONE = "rsu-v3";` (es. `"rsu-v4"`). Così i telefoni scaricano la nuova versione. Per i file in `dati` non serve.
+Quando c'è rete, l'app scarica sempre la versione più recente dei file. Se però **aggiungete un file nuovo** all'app (una pagina, un'immagine), elencatelo in `sw.js` e aumentate il numero in `const VERSIONE = "rsu-v7";` (es. `"rsu-v8"`). Per i file in `dati` non serve.
+
+Se un telefono sembra mostrare ancora la versione vecchia, chiudete l'app e riapritela: alla seconda apertura si aggiorna da sola.
 
 - **Nome dell'app**: si cambia in `manifest.webmanifest` (`name`, `short_name`) e in `index.html` (`<title>` e `apple-mobile-web-app-title`).
 - **Icone**: stanno nella cartella `icone`.
