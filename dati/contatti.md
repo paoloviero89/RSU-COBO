@@ -16,27 +16,25 @@ Questo riquadro di istruzioni non compare nell'app.
 -->
 
 # Saletta sindacale
-luogo: Saletta sindacale (indicate qui dove si trova)
-note: Orari di esempio: sostituiteli con quelli reali.
 
-- Martedì: 12:30 – 13:30
-- Giovedì: 16:30 – 17:30
+- Giovedì: 13:00 – 15:00
 
 # Delegati RSU
 
-## Nome Cognome (esempio)
+## Paolo Viero
+ruolo: Delegato RSU · RLS
+reparto: Ufficio Tecnico
+
+## Claudio Pasquini
+ruolo: Delegato RSU · RLS
+reparto: Presse· RLS
+
+## Ermira Lutia:
 ruolo: Delegato RSU
-reparto: Produzione
-telefono:
-email:
+reparto: Elettronica
 
-## Nome Cognome (esempio)
-ruolo: Delegata RSU · RLS
-reparto: Ufficio tecnico
-telefono:
-email:
+## Luca Sarassi:
+ruolo: Delegato territoriale FIM
 
-# Altri contatti
-
-## Sede territoriale del sindacato (esempio)
-Indirizzo, telefono o sito
+## Roberto Farina:
+ruolo: Delegato territoriale FIM
