@@ -32,7 +32,7 @@ La posizione dell'azienda in merito al contratto interno è che attualmente a ca
 L'azienda ha previsto la fruizione di ferie / PAR / PIR per le giornate del 6, 13, 20 e 27 novembre e per la giornata del 7 dicembre.
 In merito alla chiusura invernale, l'azienda non ha saputo darci una risposta.
 
-I lavoratori hanno espresso un grande disappunto sia per la mancata apertura sul contratto interno sia per l'imposizione delle 5 giornate di ferie.
+I lavoratori hanno espresso grande disappunto sia per la mancata apertura sul contratto interno sia per l'imposizione delle 5 giornate di ferie / PAR / PIR.
 Valuteremo nei prossimi giorni le azioni da intraprendere per far valere la voce dei lavoratori.
 
 
